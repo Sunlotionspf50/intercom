@@ -1,0 +1,10 @@
+- Read README.md before proposing changes.
+- Keep the MVP as small as possible.
+- Explain architectural and code decisions so I can learn.
+- Work in small, testable steps.
+- Do not add features outside the agreed scope.
+- Do not make major technical decisions without discussing the alternatives with me.
+- Keep changes small and suitable for focused Git commits.
+- Show the diff and ask before committing.
+- Never commit secrets, access codes, API keys or .env files.
+- Do not push or rewrite Git history without my permission.
