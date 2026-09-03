@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>46elks provider test</title>
+    <style>
+      :root {
+        color-scheme: light dark;
+        font-family: system-ui, sans-serif;
+      }
+
+      body {
+        margin: 0 auto;
+        max-width: 34rem;
+        padding: 1.5rem;
+      }
+
+      form,
+      section {
+        display: grid;
+        gap: 0.75rem;
+        margin-block: 1.5rem;
+      }
+
+      label {
+        display: grid;
+        gap: 0.25rem;
+      }
+
+      input,
+      button {
+        box-sizing: border-box;
+        font: inherit;
+        min-height: 2.75rem;
+        padding: 0.6rem 0.75rem;
+        width: 100%;
+      }
+
+      button {
+        cursor: pointer;
+      }
+
+      button:disabled {
+        cursor: not-allowed;
+      }
+
+      #status {
+        border: 1px solid currentColor;
+        border-radius: 0.35rem;
+        padding: 0.75rem;
+      }
+
+      #events {
+        font-family: ui-monospace, monospace;
+        font-size: 0.85rem;
+        overflow-wrap: anywhere;
+        padding-left: 1.25rem;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>46elks provider test</h1>
+      <p>This page does not save credentials. Close it when testing is complete.</p>
+
+      <form id="registration-form">
+        <label>
+          WebRTC username
+          <input
+            id="username"
+            name="username"
+            inputmode="numeric"
+            autocomplete="off"
+            required
+          >
+        </label>
+        <label>
+          Rotated WebRTC password
+          <input
+            id="password"
+            name="password"
+            type="password"
+            autocomplete="off"
+            required
+          >
+        </label>
+        <button id="register" type="submit">Register</button>
+      </form>
+
+      <p id="status" role="status" aria-live="polite">Not registered</p>
+
+      <section aria-label="Call controls">
+        <button id="answer" type="button" disabled>Answer</button>
+        <button id="play-audio" type="button" disabled>Play remote audio</button>
+        <button id="dtmf-info" type="button" disabled>Send 5 (SIP INFO)</button>
+        <button id="dtmf-rfc2833" type="button" disabled>Send 5 (RFC2833)</button>
+        <button id="hangup" type="button" disabled>Hang up</button>
+      </section>
+
+      <audio id="remote-audio" autoplay controls playsinline></audio>
+
+      <h2>Events</h2>
+      <ol id="events" aria-live="polite"></ol>
+    </main>
+
+    <script src="https://jssip.net/download/releases/jssip-3.10.0.min.js"></script>
+    <script>
+      const WEBSOCKET_URL = "wss://voip.46elks.com/w1/websocket";
+      const SIP_DOMAIN = "voip.46elks.com";
+
+      const form = document.querySelector("#registration-form");
+      const usernameInput = document.querySelector("#username");
+      const passwordInput = document.querySelector("#password");
+      const registerButton = document.querySelector("#register");
+      const answerButton = document.querySelector("#answer");
+      const playAudioButton = document.querySelector("#play-audio");
+      const dtmfInfoButton = document.querySelector("#dtmf-info");
+      const dtmfRfc2833Button = document.querySelector("#dtmf-rfc2833");
+      const hangupButton = document.querySelector("#hangup");
+      const status = document.querySelector("#status");
+      const events = document.querySelector("#events");
+      const remoteAudio = document.querySelector("#remote-audio");
+
+      let userAgent = null;
+      let session = null;
+
+      function log(message) {
+        const item = document.createElement("li");
+        item.textContent = `${new Date().toLocaleTimeString()} — ${message}`;
+        events.prepend(item);
+      }
+
+      function setStatus(message) {
+        status.textContent = message;
+        log(message);
+      }
+
+      function setCallControls({ incoming = false, connected = false } = {}) {
+        answerButton.disabled = !incoming;
+        playAudioButton.disabled = !connected;
+        dtmfInfoButton.disabled = !connected;
+        dtmfRfc2833Button.disabled = !connected;
+        hangupButton.disabled = !(incoming || connected);
+      }
+
+      function clearCall() {
+        session = null;
+        remoteAudio.srcObject = null;
+        setCallControls();
+      }
+
+      function playRemoteAudio(stream) {
+        if (!stream || stream.getAudioTracks().length === 0) {
+          log("No remote audio track is available yet");
+          return;
+        }
+        remoteAudio.srcObject = stream;
+        remoteAudio.muted = false;
+        remoteAudio.volume = 1;
+        remoteAudio.play().catch((error) => {
+          log(`Remote audio playback failed: ${error.message}`);
+        });
+      }
+
+      function playReceiverTracks() {
+        if (!session) return;
+        const tracks = session.connection
+          .getReceivers()
+          .map((receiver) => receiver.track)
+          .filter((track) => track && track.kind === "audio");
+        if (tracks.length > 0) playRemoteAudio(new MediaStream(tracks));
+      }
+
+      function markConnected(expectedSession) {
+        if (!session || session !== expectedSession) return;
+        setCallControls({ connected: true });
+        if (status.textContent !== "Connected") setStatus("Connected");
+        playReceiverTracks();
+      }
+
+      function watchSession(nextSession) {
+        session = nextSession;
+        setCallControls({ incoming: true });
+        setStatus("Incoming call — press Answer");
+
+        session.connection.addEventListener("track", (event) => {
+          const stream = event.streams[0] || new MediaStream([event.track]);
+          playRemoteAudio(stream);
+        });
+
+        session.on("accepted", () => markConnected(nextSession));
+        session.on("confirmed", () => markConnected(nextSession));
+
+        session.on("newDTMF", (event) => {
+          if (event.originator === "local") {
+            log(`Sent DTMF ${event.dtmf.tone}`);
+            if (typeof event.dtmf.on === "function") {
+              event.dtmf.on("succeeded", () => log("46elks accepted the DTMF request"));
+              event.dtmf.on("failed", (failure) => {
+                log(`46elks rejected the DTMF request: ${failure.cause}`);
+              });
+            }
+          }
+        });
+
+        session.on("ended", () => {
+          if (session === nextSession) {
+            clearCall();
+            setStatus("Call ended — waiting for a call");
+          } else {
+            log("Previous call ended");
+          }
+        });
+
+        session.on("failed", (event) => {
+          if (session === nextSession) {
+            clearCall();
+            setStatus(`Call failed: ${event.cause}`);
+          } else {
+            log(`Previous call failed: ${event.cause}`);
+          }
+        });
+      }
+
+      form.addEventListener("submit", (event) => {
+        event.preventDefault();
+
+        if (!window.JsSIP) {
+          setStatus("JsSIP failed to load; check the internet connection");
+          return;
+        }
+
+        const username = usernameInput.value.trim().replace(/^\+/, "");
+        const password = passwordInput.value;
+        if (!username || !password) return;
+
+        const socket = new JsSIP.WebSocketInterface(WEBSOCKET_URL);
+        userAgent = new JsSIP.UA({
+          sockets: [socket],
+          uri: `sip:${username}@${SIP_DOMAIN}`,
+          password
+        });
+
+        passwordInput.value = "";
+        usernameInput.disabled = true;
+        passwordInput.disabled = true;
+        registerButton.disabled = true;
+
+        userAgent.on("connected", () => setStatus("WebSocket connected"));
+        userAgent.on("registered", () => setStatus("Registered — waiting for a call"));
+        userAgent.on("registrationFailed", (event) => {
+          setStatus(`Registration failed: ${event.cause}`);
+        });
+        userAgent.on("disconnected", () => setStatus("WebSocket disconnected"));
+        userAgent.on("newRTCSession", (event) => {
+          if (event.originator !== "remote") return;
+          if (session && !session.isEnded()) {
+            event.session.terminate({ status_code: 486, reason_phrase: "Busy" });
+            return;
+          }
+          if (session) clearCall();
+          watchSession(event.session);
+        });
+
+        setStatus("Connecting…");
+        userAgent.start();
+      });
+
+      answerButton.addEventListener("click", () => {
+        if (!session || !session.isInProgress()) return;
+        session.answer({ mediaConstraints: { audio: true, video: false } });
+        setStatus("Answering…");
+        setTimeout(() => {
+          if (session && session.isEstablished()) markConnected(session);
+        });
+      });
+
+      playAudioButton.addEventListener("click", () => {
+        playReceiverTracks();
+        remoteAudio.play().catch((error) => {
+          log(`Remote audio playback failed: ${error.message}`);
+        });
+      });
+
+      function sendFive(transportType) {
+        if (!session || !session.isEstablished()) {
+          setStatus("DTMF unavailable because the call is not established");
+          return;
+        }
+        try {
+          session.sendDTMF("5", { transportType, duration: 200 });
+          log(`Requested DTMF 5 using ${transportType}`);
+        } catch (error) {
+          setStatus(`DTMF failed: ${error.message}`);
+        }
+      }
+
+      dtmfInfoButton.addEventListener("click", () => sendFive("INFO"));
+      dtmfRfc2833Button.addEventListener("click", () => sendFive("RFC2833"));
+
+      hangupButton.addEventListener("click", () => {
+        if (!session) return;
+        const endingSession = session;
+        clearCall();
+        setStatus("Call ended — waiting for a call");
+        endingSession.terminate();
+      });
+
+      window.addEventListener("pagehide", () => {
+        if (session) session.terminate();
+        if (userAgent) userAgent.stop();
+      });
+    </script>
+  </body>
+</html>
