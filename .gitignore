@@ -2,6 +2,9 @@
 .env
 .env.*
 !.env.example
+.dev.vars
+.dev.vars.*
+.wrangler/
 .secrets/
 secrets/
 credentials/
@@ -46,3 +49,6 @@ Thumbs.db
 .vscode/
 *.swp
 *~
+
+# Local provider research artifact
+keypad_dial.png

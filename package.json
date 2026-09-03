@@ -1,0 +1,27 @@
+{
+  "name": "intercom",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite dev",
+    "build": "vite build && node scripts/scrub-build-secrets.mjs",
+    "check": "tsc --noEmit",
+    "test": "vitest run",
+    "deploy": "npm run build && wrangler deploy --secrets-file .dev.vars"
+  },
+  "dependencies": {
+    "jssip": "3.10.0"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "latest",
+    "@cloudflare/workers-types": "latest",
+    "typescript": "latest",
+    "vite": "latest",
+    "vitest": "latest",
+    "wrangler": "latest"
+  },
+  "engines": {
+    "node": ">=24 <25"
+  }
+}
