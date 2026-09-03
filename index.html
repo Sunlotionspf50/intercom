@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#f3eee4">
+    <meta name="color-scheme" content="light">
+    <title>Apartment intercom</title>
+  </head>
+  <body>
+    <main class="shell">
+      <article class="handset" aria-labelledby="app-title">
+        <header class="brand">
+          <span class="brand-mark" aria-hidden="true">5</span>
+          <div>
+            <p class="eyebrow">Private handset</p>
+            <h1 id="app-title">Apartment intercom</h1>
+          </div>
+        </header>
+
+        <p id="message" class="message" role="status" aria-live="polite" hidden></p>
+
+        <section id="login-view" class="view">
+          <div class="intro">
+            <p class="eyebrow">Access</p>
+            <h2>Ready for visitors</h2>
+            <p>Enter the shared code to turn this browser into the intercom handset.</p>
+          </div>
+          <form id="login-form" class="stack">
+            <label for="access-code">Access code</label>
+            <input
+              id="access-code"
+              name="code"
+              type="password"
+              inputmode="numeric"
+              autocomplete="current-password"
+              required
+            >
+            <button id="login-button" class="button button-primary" type="submit">Start listening</button>
+          </form>
+          <p class="hint">Keep this page open and your phone unlocked while waiting.</p>
+        </section>
+
+        <section id="waiting-view" class="view centered" hidden>
+          <div class="signal" aria-hidden="true"><span></span></div>
+          <p class="eyebrow">Intercom online</p>
+          <h2>Waiting for a call</h2>
+          <p id="waiting-status">Connecting to the handset…</p>
+          <p class="hint">Keep this page in the foreground and the phone unlocked.</p>
+        </section>
+
+        <section id="incoming-view" class="view centered" hidden>
+          <div class="incoming-icon" aria-hidden="true">↘</div>
+          <p class="eyebrow">Incoming call</p>
+          <h2>Someone is at the door</h2>
+          <p>Answer to speak through the intercom.</p>
+          <button id="answer-button" class="button button-answer" type="button">Answer</button>
+        </section>
+
+        <section id="connected-view" class="view centered" hidden>
+          <div class="connected-dot" aria-hidden="true"></div>
+          <p class="eyebrow">Connected</p>
+          <h2>Intercom call</h2>
+          <p id="call-status">You can speak now.</p>
+          <button id="open-button" class="door-button" type="button">
+            <span aria-hidden="true">5</span>
+            Open door
+          </button>
+          <button id="sound-button" class="button button-secondary" type="button" hidden>Enable sound</button>
+          <button id="hangup-button" class="button button-hangup" type="button">Hang up and log out</button>
+        </section>
+
+        <footer>
+          <span>Session</span>
+          <time id="session-time">Not active</time>
+        </footer>
+      </article>
+    </main>
+    <audio id="remote-audio" autoplay playsinline></audio>
+    <script type="module" src="/src/client/main.ts"></script>
+  </body>
+</html>

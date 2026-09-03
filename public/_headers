@@ -1,0 +1,5 @@
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Permissions-Policy: camera=(), geolocation=()
+  Content-Security-Policy: default-src 'self'; connect-src 'self' wss://voip.46elks.com ws://localhost:*; img-src 'self'; media-src 'self' blob:; style-src 'self'; script-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'
