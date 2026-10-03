@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  normalizeSipUri,
+  incomingCallAction,
+  DOOR_SIGNAL_ACTION,
   providerAddressAllowed,
   validIncomingCall,
 } from "../src/worker/provider";
@@ -22,8 +23,11 @@ describe("provider callback checks", () => {
     expect(validIncomingCall(form, "+46100000001")).toBe(false);
   });
 
-  it("normalizes the provider URI for JsSIP", () => {
-    expect(normalizeSipUri("4600@example.com")).toBe("sip:4600@example.com");
-    expect(normalizeSipUri("sip:4600@example.com")).toBe("sip:4600@example.com");
+  it("plays the door signal when an access window is active", () => {
+    expect(incomingCallAction(true, "+46700000000")).toEqual({ play: DOOR_SIGNAL_ACTION });
+  });
+
+  it("routes to the owner phone when no access window is active", () => {
+    expect(incomingCallAction(false, "+46700000000")).toEqual({ connect: "+46700000000" });
   });
 });

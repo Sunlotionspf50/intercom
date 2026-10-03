@@ -10,9 +10,6 @@
     "test": "vitest run",
     "deploy": "npm run build && wrangler deploy --secrets-file .dev.vars"
   },
-  "dependencies": {
-    "jssip": "3.10.0"
-  },
   "devDependencies": {
     "@cloudflare/vite-plugin": "latest",
     "@cloudflare/workers-types": "latest",

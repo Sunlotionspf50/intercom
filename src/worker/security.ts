@@ -1,6 +1,6 @@
 const encoder = new TextEncoder();
 
-export const SESSION_LENGTH_MS = 30 * 60 * 1000;
+export const SESSION_LENGTH_MS = 2 * 60 * 1000;
 export const RATE_WINDOW_MS = 15 * 60 * 1000;
 export const RATE_BLOCK_MS = 15 * 60 * 1000;
 export const MAX_FAILED_ATTEMPTS = 5;

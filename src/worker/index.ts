@@ -1,5 +1,9 @@
 import type { AuthState } from "./auth-state";
-import { normalizeSipUri, providerAddressAllowed, validIncomingCall } from "./provider";
+import {
+  incomingCallAction,
+  providerAddressAllowed,
+  validIncomingCall,
+} from "./provider";
 import {
   createSessionToken,
   keyedHash,
@@ -16,28 +20,12 @@ interface Env {
   AUTH_STATE: DurableObjectNamespace<AuthState>;
   ACCESS_CODE: string;
   SESSION_SECRET: string;
-  WEBRTC_USERNAME: string;
-  WEBRTC_PASSWORD: string;
-  WEBRTC_URI: string;
-  WEBRTC_WEBSOCKET_URL: string;
   PROVIDER_PHONE_NUMBER: string;
-  PROVIDER_WEBRTC_NUMBER: string;
+  OWNER_PHONE_NUMBER: string;
   PROVIDER_CALLBACK_IPS: string;
 }
 
-type SecurityEvent =
-  | "call_answered"
-  | "door_open_requested"
-  | "call_hangup"
-  | "call_remote_end";
-
 const COOKIE_NAME = "intercom_session";
-const SECURITY_EVENTS = new Set<SecurityEvent>([
-  "call_answered",
-  "door_open_requested",
-  "call_hangup",
-  "call_remote_end",
-]);
 
 function json(body: unknown, status = 200, headers: HeadersInit = {}): Response {
   return Response.json(body, {
@@ -78,12 +66,8 @@ function requiredConfiguration(env: Env): string[] {
   const required: Array<keyof Env> = [
     "ACCESS_CODE",
     "SESSION_SECRET",
-    "WEBRTC_USERNAME",
-    "WEBRTC_PASSWORD",
-    "WEBRTC_URI",
-    "WEBRTC_WEBSOCKET_URL",
     "PROVIDER_PHONE_NUMBER",
-    "PROVIDER_WEBRTC_NUMBER",
+    "OWNER_PHONE_NUMBER",
     "PROVIDER_CALLBACK_IPS",
   ];
   return required.filter((name) => !env[name]).map(String);
@@ -131,9 +115,9 @@ async function createSession(request: Request, env: Env): Promise<Response> {
   const token = createSessionToken();
   const expiresAt = Date.now() + SESSION_LENGTH_MS;
   await authState(env).createSession(await sha256(token), expiresAt);
-  log("session_created", { source: ipHash.slice(0, 12), expiresAt });
+  log("access_window_started", { source: ipHash.slice(0, 12), expiresAt });
   return json(
-    { authenticated: true, expiresAt },
+    { armed: true, expiresAt },
     201,
     { "Set-Cookie": sessionCookie(token) },
   );
@@ -143,12 +127,12 @@ async function getSession(request: Request, env: Env): Promise<Response> {
   const session = await currentSession(request, env);
   if (!session) {
     return json(
-      { authenticated: false },
+      { armed: false },
       401,
       { "Set-Cookie": expiredCookie() },
     );
   }
-  return json({ authenticated: true, expiresAt: session.expiresAt });
+  return json({ armed: true, expiresAt: session.expiresAt });
 }
 
 async function deleteSession(request: Request, env: Env): Promise<Response> {
@@ -157,42 +141,14 @@ async function deleteSession(request: Request, env: Env): Promise<Response> {
   const session = await currentSession(request, env);
   if (session) {
     await authState(env).deleteSession(session.tokenHash);
-    log("session_ended");
+    log("access_window_ended");
   } else if (suppliedToken) {
-    log("session_expired");
+    log("access_window_expired");
   }
   return new Response(null, {
     status: 204,
     headers: { "Set-Cookie": expiredCookie(), "Cache-Control": "no-store" },
   });
-}
-
-async function phoneConfig(request: Request, env: Env): Promise<Response> {
-  const session = await currentSession(request, env);
-  if (!session) return json({ error: "Session expired" }, 401);
-  return json({
-    username: env.WEBRTC_USERNAME,
-    password: env.WEBRTC_PASSWORD,
-    uri: normalizeSipUri(env.WEBRTC_URI),
-    websocketUrl: env.WEBRTC_WEBSOCKET_URL,
-    expiresAt: session.expiresAt,
-  });
-}
-
-async function recordSecurityEvent(request: Request, env: Env): Promise<Response> {
-  if (!sameOrigin(request)) return json({ error: "Invalid request origin" }, 403);
-  if (!(await currentSession(request, env))) return json({ error: "Session expired" }, 401);
-  let body: { event?: unknown };
-  try {
-    body = await request.json();
-  } catch {
-    return json({ error: "Invalid event" }, 400);
-  }
-  if (typeof body.event !== "string" || !SECURITY_EVENTS.has(body.event as SecurityEvent)) {
-    return json({ error: "Invalid event" }, 400);
-  }
-  log(body.event);
-  return new Response(null, { status: 204, headers: { "Cache-Control": "no-store" } });
 }
 
 async function providerForm(request: Request): Promise<URLSearchParams | null> {
@@ -216,8 +172,15 @@ async function incomingCall(request: Request, env: Env): Promise<Response> {
   }
 
   log("provider_call_received", { callId: form.get("callid") });
+  const hasActiveAccessWindow = await authState(env).consumeActiveAccessWindow(Date.now());
+  log(hasActiveAccessWindow ? "door_signal_requested" : "owner_fallback_requested", {
+    callId: form.get("callid"),
+  });
   const hangupUrl = new URL("/api/provider/hangup", request.url).toString();
-  return json({ connect: env.PROVIDER_WEBRTC_NUMBER, whenhangup: hangupUrl });
+  return json({
+    ...incomingCallAction(hasActiveAccessWindow, env.OWNER_PHONE_NUMBER),
+    whenhangup: hangupUrl,
+  });
 }
 
 async function providerHangup(request: Request, env: Env): Promise<Response> {
@@ -247,12 +210,6 @@ async function api(request: Request, env: Env): Promise<Response> {
   }
   if (url.pathname === "/api/session" && request.method === "DELETE") {
     return deleteSession(request, env);
-  }
-  if (url.pathname === "/api/phone-config" && request.method === "GET") {
-    return phoneConfig(request, env);
-  }
-  if (url.pathname === "/api/security-events" && request.method === "POST") {
-    return recordSecurityEvent(request, env);
   }
   if (url.pathname === "/api/provider/incoming" && request.method === "POST") {
     return incomingCall(request, env);

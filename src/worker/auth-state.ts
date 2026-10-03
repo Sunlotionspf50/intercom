@@ -72,6 +72,7 @@ export class AuthState extends DurableObject<AuthStateEnv> {
 
   async createSession(tokenHash: string, expiresAt: number): Promise<void> {
     this.ctx.storage.sql.exec("DELETE FROM sessions WHERE expires_at <= ?", Date.now());
+    this.ctx.storage.sql.exec("DELETE FROM sessions");
     this.ctx.storage.sql.exec(
       "INSERT OR REPLACE INTO sessions (token_hash, expires_at) VALUES (?, ?)",
       tokenHash,
@@ -88,6 +89,17 @@ export class AuthState extends DurableObject<AuthStateEnv> {
       )
       .toArray();
     return rows[0]?.expires_at ?? null;
+  }
+
+  async consumeActiveAccessWindow(now: number): Promise<boolean> {
+    this.ctx.storage.sql.exec("DELETE FROM sessions WHERE expires_at <= ?", now);
+    const rows = this.ctx.storage.sql.exec<{ token_hash: string }>(
+      "SELECT token_hash FROM sessions LIMIT 1",
+    ).toArray();
+    if (rows.length === 0) return false;
+
+    this.ctx.storage.sql.exec("DELETE FROM sessions");
+    return true;
   }
 
   async deleteSession(tokenHash: string): Promise<void> {

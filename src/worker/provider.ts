@@ -16,6 +16,15 @@ export function validIncomingCall(form: URLSearchParams, configuredNumber: strin
   );
 }
 
-export function normalizeSipUri(uri: string): string {
-  return uri.startsWith("sip:") ? uri : `sip:${uri}`;
+export const DOOR_SIGNAL_ACTION = "sound/dtmf/5";
+
+export type IncomingCallAction =
+  | { play: typeof DOOR_SIGNAL_ACTION }
+  | { connect: string };
+
+export function incomingCallAction(
+  hasActiveAccessWindow: boolean,
+  ownerPhoneNumber: string,
+): IncomingCallAction {
+  return hasActiveAccessWindow ? { play: DOOR_SIGNAL_ACTION } : { connect: ownerPhoneNumber };
 }

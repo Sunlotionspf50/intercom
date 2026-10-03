@@ -5,7 +5,14 @@ import {
   MAX_FAILED_ATTEMPTS,
   RATE_BLOCK_MS,
   readCookie,
+  SESSION_LENGTH_MS,
 } from "../src/worker/security";
+
+describe("session timeout", () => {
+  it("expires sessions after two minutes", () => {
+    expect(SESSION_LENGTH_MS).toBe(2 * 60 * 1000);
+  });
+});
 
 describe("access-code comparison", () => {
   it("accepts only the configured code", async () => {
