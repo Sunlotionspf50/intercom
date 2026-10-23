@@ -50,11 +50,22 @@ h1 {
   display: grid;
 }
 
+.access-entry {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid #b9bbb8;
+  transition: border-color 160ms ease;
+}
+
+.access-entry:focus-within {
+  border-color: #242625;
+}
+
 input {
-  width: 100%;
+  min-width: 0;
+  flex: 1;
   min-height: 52px;
   border: 0;
-  border-bottom: 1px solid #b9bbb8;
   border-radius: 0;
   outline: 0;
   padding: 10px 0;
@@ -62,7 +73,45 @@ input {
   background: transparent;
   font-size: 1.15rem;
   letter-spacing: 0.08em;
-  transition: border-color 160ms ease;
+}
+
+.submit-button {
+  display: grid;
+  flex: 0 0 44px;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  margin-left: 8px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #242625;
+  background: transparent;
+  cursor: pointer;
+}
+
+.submit-button:hover {
+  background: #e8e9e5;
+}
+
+.submit-button:focus-visible {
+  outline: 2px solid #242625;
+  outline-offset: 2px;
+}
+
+.submit-button:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+
+.submit-button svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
 }
 
 input::placeholder {
